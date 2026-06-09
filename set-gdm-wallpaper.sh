@@ -10,10 +10,10 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 GDM_GRESOURCE="/usr/share/gnome-shell/gnome-shell-theme.gresource"
 GDM_BACKUP="${GDM_GRESOURCE}.backup"
-WALLPAPER_MARKER="wallpaper-gdm.png"           # sentinel present only in our modified builds
+WALLPAPER_MARKER="wallpaper-gdm.png" # sentinel present only in our modified builds
 WALLPAPER_RES_PATH="/org/gnome/shell/theme/wallpaper-gdm.png"
 WALLPAPER_REL_PATH="org/gnome/shell/theme/wallpaper-gdm.png"
-CSS_RES_PATH="org/gnome/shell/theme/gnome-shell.css"
+CSS_RES_PATH="org/gnome/shell/theme/gnome-shell-dark.css"
 
 # ---------------------------------------------------------------------------
 # Prerequisite: must run as root
@@ -231,7 +231,10 @@ EOF
 # ---------------------------------------------------------------------------
 # Compile the patched resources into a new gresource file
 # ---------------------------------------------------------------------------
-glib-compile-resources "$GRESOURCE_XML"
+glib-compile-resources \
+  --sourcedir="$workdir" \
+  --sourcedir="$(dirname "$GRESOURCE_XML")" \
+  "$GRESOURCE_XML"
 
 # ---------------------------------------------------------------------------
 # Back up the original (unmodified) gresource before overwriting it
