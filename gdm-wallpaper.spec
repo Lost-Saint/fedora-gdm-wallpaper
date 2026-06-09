@@ -1,38 +1,45 @@
-Name:    gdm-wallpaper
-Version: 1
-Release: 4
-Summary: gdm-wallpaper
+Name:           gdm-wallpaper
+Version:        1.0
+Release:        %autorelease
+Summary:        Set the GDM login screen wallpaper on GNOME 45+
 
-Source0: set-gdm-wallpaper.sh
+# Source tarball / script — hosted on GitHub (replace with your actual URL)
+URL:            https://github.com/lost-saint/gdm-wallpaper
+Source0:        set-gdm-wallpaper
 
-License: Public Domain
+License:        GLWTS
 
-Requires(post): info
-Requires(preun): info
+# Shell script — no compiled artifacts, runs on any arch
+BuildArch:      noarch
 
-Requires: glib2-devel
-
-BuildArch: noarch
+# Runtime: needs gresource + glib-compile-resources (both in glib2)
+# glib2-devel is wrong here — that's the headers-only dev package.
+# The binaries ship in glib2 itself on Fedora.
+Requires:       glib2
+Requires:       file
 
 %description
-Script for GNOME 3.16+ with GNOME Shell themes packed inside /usr/share/gnome-shell/gnome-shell-theme.gresource.
+Command-line tool to set the GDM (GNOME Display Manager) login and lock
+screen wallpaper on Fedora systems running GNOME 45 or later.
+
+Supports GNOME 45+ where gnome-shell.css was split into
+gnome-shell-dark.css and gnome-shell-light.css, as well as older GNOME
+releases using the legacy single gnome-shell.css.
+
+Automatically backs up the original gnome-shell-theme.gresource before
+applying changes and provides an --uninstall flag to restore it.
+
+%prep
+# Nothing to unpack — single script install
+
+%build
+# Nothing to compile
 
 %install
-mkdir -p %{buildroot}/%{_bindir}
-install -p -m 755 %{SOURCE0} %{buildroot}/%{_bindir}
-
-%post
-if [ -f "/usr/bin/set-gdm-wallpaper" ]; then
- unlink /usr/bin/set-gdm-wallpaper
-fi
-cp -s /usr/bin/set-gdm-wallpaper.sh /usr/bin/set-gdm-wallpaper
-
-%preun
-if [ -f "/usr/bin/set-gdm-wallpaper" ]; then
- unlink /usr/bin/set-gdm-wallpaper
-fi
+install -D -m 0755 %{SOURCE0} %{buildroot}%{_bindir}/set-gdm-wallpaper
 
 %files
-%{_bindir}/set-gdm-wallpaper.sh
+%{_bindir}/set-gdm-wallpaper
 
 %changelog
+%autochangelog
