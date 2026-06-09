@@ -267,18 +267,6 @@ if [ "$css_patched" -eq 0 ]; then
   exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# Compile the patched resources into a new gresource file
-#
-# glib-compile-resources resolves file paths listed in the XML relative to
-# --sourcedir, NOT relative to the XML file itself.  Without this flag it
-# defaults to the current working directory, which causes:
-#   "Failed to locate 'org/gnome/shell/theme/foo.svg' in current directory"
-# on GNOME 47+ where every resource path includes the full prefix.
-# We pass --sourcedir twice: once for the workdir root (covers the full
-# org/gnome/shell/theme/... tree) and once for the XML's own directory as a
-# fallback, matching how glib-compile-resources resolves sibling files.
-# ---------------------------------------------------------------------------
 glib-compile-resources \
   --sourcedir="$workdir" \
   --sourcedir="$(dirname "$GRESOURCE_XML")" \

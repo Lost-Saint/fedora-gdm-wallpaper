@@ -12,9 +12,6 @@ License:        GLWTS
 # Shell script — no compiled artifacts, runs on any arch
 BuildArch:      noarch
 
-# Runtime: needs gresource + glib-compile-resources (both in glib2)
-# glib2-devel is wrong here — that's the headers-only dev package.
-# The binaries ship in glib2 itself on Fedora.
 Requires:       glib2
 Requires:       file
 
