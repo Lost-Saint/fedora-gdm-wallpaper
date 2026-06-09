@@ -10,10 +10,13 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 GDM_GRESOURCE="/usr/share/gnome-shell/gnome-shell-theme.gresource"
 GDM_BACKUP="${GDM_GRESOURCE}.backup"
-WALLPAPER_MARKER="wallpaper-gdm.png" # sentinel present only in our modified builds
+WALLPAPER_MARKER="wallpaper-gdm.png"           # sentinel present only in our modified builds
 WALLPAPER_RES_PATH="/org/gnome/shell/theme/wallpaper-gdm.png"
 WALLPAPER_REL_PATH="org/gnome/shell/theme/wallpaper-gdm.png"
-CSS_RES_PATH="org/gnome/shell/theme/gnome-shell-dark.css"
+# GNOME 45+ split gnome-shell.css into dark+light. We patch whatever files exist.
+CSS_RES_PATH_LEGACY="org/gnome/shell/theme/gnome-shell.css"
+CSS_RES_PATH_DARK="org/gnome/shell/theme/gnome-shell-dark.css"
+CSS_RES_PATH_LIGHT="org/gnome/shell/theme/gnome-shell-light.css"
 
 # ---------------------------------------------------------------------------
 # Prerequisite: must run as root
@@ -207,29 +210,74 @@ cp -f "$image" "$workdir/$WALLPAPER_REL_PATH"
 echo '</gresource></gresources>' >>"$GRESOURCE_XML"
 
 # ---------------------------------------------------------------------------
-# Patch gnome-shell.css: replace #lockDialogGroup block with our wallpaper
+# Patch CSS: replace #lockDialogGroup in every CSS file that exists.
+#
+# GNOME 44 and earlier: single gnome-shell.css
+# GNOME 45+:           gnome-shell-dark.css + gnome-shell-light.css
+#                       (gnome-shell.css no longer exists)
+# We detect which files are present and patch all of them so the wallpaper
+# appears regardless of whether the user is running a dark or light theme.
 # ---------------------------------------------------------------------------
 new_theme_params="background: #2e3436 url(resource:\/\/\/org\/gnome\/shell\/theme\/wallpaper-gdm.png);"
 
 # Escape any sed metacharacters in image_parameters (/, &, \) before injection.
 safe_params=$(printf '%s' "$image_parameters" | sed 's/[\/&]/\\&/g')
 
-sed -i -z -E \
-  "s/#lockDialogGroup \{[^}]+/#lockDialogGroup \{${new_theme_params}${safe_params}/g" \
-  "$workdir/$CSS_RES_PATH"
+patch_css_file() {
+  local css_file="$1"
+  if [ ! -f "$css_file" ]; then
+    return 0  # file not present in this theme version — skip silently
+  fi
 
-# GDM 44+ moved the login dialog background to .login-dialog; set it
-# transparent so the #lockDialogGroup wallpaper shows through.
-cat >>"$workdir/$CSS_RES_PATH" <<'EOF'
+  echo "  Patching: $(basename "$css_file")"
+
+  sed -i -z -E \
+    "s/#lockDialogGroup \{[^}]+/#lockDialogGroup \{${new_theme_params}${safe_params}/g" \
+    "$css_file"
+
+  # GDM 44+ moved the login dialog background to .login-dialog; set it
+  # transparent so the #lockDialogGroup wallpaper shows through.
+  cat >>"$css_file" <<'CSSEOF'
 
 /* set-gdm-wallpaper: GDM 44+ transparency fix */
 .login-dialog {
   background-color: transparent;
 }
-EOF
+CSSEOF
+}
+
+# Patch whichever CSS files actually exist in the extracted theme.
+css_patched=0
+for css_candidate in \
+    "$workdir/$CSS_RES_PATH_DARK" \
+    "$workdir/$CSS_RES_PATH_LIGHT" \
+    "$workdir/$CSS_RES_PATH_LEGACY"; do
+  if [ -f "$css_candidate" ]; then
+    patch_css_file "$css_candidate"
+    css_patched=1
+  fi
+done
+
+if [ "$css_patched" -eq 0 ]; then
+  echo "Error: could not find any gnome-shell CSS file to patch in the extracted theme."
+  echo "Expected one of:"
+  echo "  $CSS_RES_PATH_DARK"
+  echo "  $CSS_RES_PATH_LIGHT"
+  echo "  $CSS_RES_PATH_LEGACY"
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Compile the patched resources into a new gresource file
+#
+# glib-compile-resources resolves file paths listed in the XML relative to
+# --sourcedir, NOT relative to the XML file itself.  Without this flag it
+# defaults to the current working directory, which causes:
+#   "Failed to locate 'org/gnome/shell/theme/foo.svg' in current directory"
+# on GNOME 47+ where every resource path includes the full prefix.
+# We pass --sourcedir twice: once for the workdir root (covers the full
+# org/gnome/shell/theme/... tree) and once for the XML's own directory as a
+# fallback, matching how glib-compile-resources resolves sibling files.
 # ---------------------------------------------------------------------------
 glib-compile-resources \
   --sourcedir="$workdir" \
